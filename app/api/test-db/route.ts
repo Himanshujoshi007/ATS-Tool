@@ -3,11 +3,11 @@ import { NextResponse } from 'next/server';
 
 export async function GET() {
   try {
-    const mongoUri = process.env.MONGO_URI;
+    const mongoUri = process.env.MONGODB_URI || process.env.MONGO_URI;
     
     if (!mongoUri) {
       return NextResponse.json(
-        { status: 'Failed', message: 'MONGO_URI is missing in .env.local' }, 
+        { status: 'Failed', message: 'MONGODB_URI is missing' }, 
         { status: 500 }
       );
     }
