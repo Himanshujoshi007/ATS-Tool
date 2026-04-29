@@ -221,7 +221,7 @@ function writeSkillVisualRow(
   introLine: string,
   summaryLines: string[]
 ): number {
-  let yy = ensureSpace(doc, y, 40);
+  const yy = ensureSpace(doc, y, 40);
 
   doc.setDrawColor(C_LINE[0], C_LINE[1], C_LINE[2]);
   doc.line(MARGIN, yy - 2, PAGE_W - MARGIN, yy - 2);
@@ -273,7 +273,7 @@ function writeRatioVisualRow(
   item: AuditItem,
   ps: AuditReportPayload['pdfSemantic']
 ): number {
-  let yy = ensureSpace(doc, y, 75);
+  const yy = ensureSpace(doc, y, 75);
 
   doc.setDrawColor(C_LINE[0], C_LINE[1], C_LINE[2]);
   doc.line(MARGIN, yy - 2, PAGE_W - MARGIN, yy - 2);

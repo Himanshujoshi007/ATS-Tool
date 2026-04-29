@@ -3,23 +3,44 @@
 import React, { useState, useRef, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence, useMotionValue, useSpring, useTransform } from 'framer-motion';
 import { 
-  Upload, FileText, CheckCircle2, AlertTriangle, XCircle, 
-  RefreshCw, Briefcase, Award, Zap, Check, ArrowRight, Download, Hexagon 
+  Upload, CheckCircle2, AlertTriangle, XCircle, 
+  RefreshCw, Award, Download 
 } from 'lucide-react';
-import type { AuditReportPayload } from '@/lib/auditAnalysis';
+import type { AuditReportPayload, FeedbackCard } from '@/lib/auditAnalysis';
 import { buildAuditReport } from '@/lib/auditAnalysis';
 import { extractResumeFile } from '@/lib/extractResume';
 import { downloadAuditPdf } from '@/lib/generateAuditPdf';
 
+// MarqueeLine component moved outside to fix lint error
+function MarqueeLine({ reverse = false, speed = 100, opacity = 0.05 }: { reverse?: boolean; speed?: number; opacity?: number }) {
+  const techGiants = ["Google", "Apple", "Microsoft", "Amazon", "Meta", "Tesla", "Netflix", "IBM", "Stripe", "OpenAI", "Nvidia", "Adobe", "Shopify", "SpaceX", "Oracle", "Cisco", "Intel", "Qualcomm"];
+  return (
+    <div className="flex overflow-hidden whitespace-nowrap select-none pointer-events-none mb-10">
+      <motion.div 
+        initial={{ x: reverse ? "-50%" : "0%" }}
+        animate={{ x: reverse ? "0%" : "-50%" }}
+        transition={{ duration: speed, repeat: Infinity, ease: "linear" }}
+        className="flex gap-32 items-center pr-32"
+        style={{ opacity }}
+      >
+        {[...techGiants, ...techGiants, ...techGiants].map((c, i) => (
+          <span key={i} className="text-[8rem] font-black italic tracking-tighter">{c.toUpperCase()}</span>
+        ))}
+      </motion.div>
+    </div>
+  );
+}
+
 export default function ResumeChecker() {
-  const [file, setFile] = useState<File | null>(null);
+  // File state kept for potential future use
+  const [_file, setFile] = useState<File | null>(null);
   const [status, setStatus] = useState<'idle' | 'scanning' | 'results'>('idle');
   const [scanStep, setScanStep] = useState('');
   const [report, setReport] = useState<AuditReportPayload | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const targetResumeCount = useMemo(
-    () => 700 + Math.floor(Math.random() * 51),
+    () => 750,
     []
   );
   const [resumeCount, setResumeCount] = useState(0);
@@ -64,8 +85,6 @@ export default function ResumeChecker() {
     x.set(0);
     y.set(0);
   };
-
-  const techGiants = ["Google", "Apple", "Microsoft", "Amazon", "Meta", "Tesla", "Netflix", "IBM", "Stripe", "OpenAI", "Nvidia", "Adobe", "Shopify", "SpaceX", "Oracle", "Cisco", "Intel", "Qualcomm"];
 
   const simulateScan = async (selectedFile: File) => {
     setStatus('scanning');
@@ -118,22 +137,6 @@ export default function ResumeChecker() {
     if (!report) return;
     downloadAuditPdf(report, report.fileName);
   };
-
-  const MarqueeLine = ({ reverse = false, speed = 100, opacity = 0.05 }) => (
-    <div className="flex overflow-hidden whitespace-nowrap select-none pointer-events-none mb-10">
-      <motion.div 
-        initial={{ x: reverse ? "-50%" : "0%" }}
-        animate={{ x: reverse ? "0%" : "-50%" }}
-        transition={{ duration: speed, repeat: Infinity, ease: "linear" }}
-        className="flex gap-32 items-center pr-32"
-        style={{ opacity }}
-      >
-        {[...techGiants, ...techGiants, ...techGiants].map((c, i) => (
-          <span key={i} className="text-[8rem] font-black italic tracking-tighter">{c.toUpperCase()}</span>
-        ))}
-      </motion.div>
-    </div>
-  );
 
   return (
     <div className="min-h-screen bg-black text-white overflow-hidden relative selection:bg-yellow-500/30">
@@ -281,7 +284,7 @@ export default function ResumeChecker() {
                 <div className="lg:col-span-2 bg-white/[0.02] backdrop-blur-2xl p-16 rounded-[4rem] border border-white/10 shadow-2xl">
                   <h3 className="text-yellow-500 font-black uppercase tracking-widest mb-14 flex items-center gap-8 text-4xl italic underline underline-offset-[12px] decoration-white/10"><Award size={48}/> Semantic Logic Log</h3>
                   <div className="space-y-10">
-                    {report.feedback.map((f: any, i: number) => (
+                    {report.feedback.map((f: FeedbackCard, i: number) => (
                       <motion.div 
                         whileHover={{ x: 20, backgroundColor: "rgba(255,255,255,0.05)" }}
                         key={i} className="flex gap-10 p-10 rounded-[2.5rem] border border-white/5 bg-white/0 transition-all cursor-default group"

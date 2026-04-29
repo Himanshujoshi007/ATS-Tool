@@ -337,7 +337,7 @@ export function buildAuditReport(
     },
     {
       title: 'Word Count',
-      status: wordCount >= 350 && wordCount <= 900 ? 'pass' : wordCount > 0 ? 'fail' : 'fail',
+      status: wordCount >= 350 && wordCount <= 900 ? 'pass' : 'fail',
       lines: [
         `Your resume contains ${wordCount} word${wordCount === 1 ? '' : 's'}.`,
         wordCount === 0

@@ -1,8 +1,6 @@
-// resume-backend/api/capture.js
-const mongoose = require('mongoose');
-const multer = require('multer');
-const pdfjs = require('pdfjs-dist');
-const { Buffer } = require('buffer');
+import mongoose from 'mongoose';
+import multer from 'multer';
+import * as pdfjs from 'pdfjs-dist';
 
 const upload = multer({ storage: multer.memoryStorage() });
 
@@ -16,7 +14,7 @@ async function connectDB() {
   if (cached.conn) return cached.conn;
   
   if (!cached.promise) {
-    cached.promise = mongoose.connect(process.env.MONGO_URI, {
+    cached.promise = mongoose.connect(process.env.MONGODB_URI || process.env.MONGO_URI, {
       bufferCommands: false,
     }).then((mongoose) => mongoose);
   }
@@ -65,14 +63,10 @@ async function extractData(buffer) {
   };
 }
 
-// Vercel config
-exports.config = {
-  api: {
-    bodyParser: false,
-  },
-};
+// Self-hosted config for Express
+// No bodyParser config needed - Express handles this natively
 
-module.exports = async function handler(req, res) {
+export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }

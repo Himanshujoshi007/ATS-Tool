@@ -1,0 +1,37 @@
+ATS tool/
+├── .env.local
+├── .gitignore
+├── .qodo/
+│   ├── agents/
+│   └── workflows/
+├── .vercel/
+│   ├── project.json
+│   └── README.txt
+├── AGENTS.md
+├── api/
+│   └── capture.js
+├── app/
+│   ├── api/
+│   │   └── test-db/
+│   │       └── route.ts
+│   ├── favicon.ico
+│   ├── globals.css
+│   ├── layout.tsx
+│   └── page.tsx
+├── CLAUDE.md
+├── eslint.config.mjs
+├── generate-structure.js
+├── lib/
+│   ├── auditAnalysis.ts
+│   ├── extractResume.ts
+│   ├── generateAuditPdf.ts
+│   └── lib/
+│       └── mongodb.ts
+├── next-env.d.ts
+├── next.config.bak
+├── package-lock.json
+├── package.json
+├── postcss.config.mjs
+├── README.md
+├── tsconfig.json
+└── tsconfig.tsbuildinfo
