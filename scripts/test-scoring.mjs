@@ -3,7 +3,8 @@ import { readFileSync, mkdirSync, writeFileSync } from 'node:fs';
 import ts from 'typescript';
 const compile = path => ts.transpileModule(readFileSync(new URL(path, import.meta.url), 'utf8'), { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 } }).outputText;
 const extraction = `data:text/javascript;base64,${Buffer.from(compile('../lib/extractResume.ts')).toString('base64')}`;
-const compiled = compile('../lib/auditAnalysis.ts').replace("'./extractResume'", JSON.stringify(extraction));
+const technical = `data:text/javascript;base64,${Buffer.from(compile('../lib/technicalAnalysis.ts')).toString('base64')}`;
+const compiled = compile('../lib/auditAnalysis.ts').replace("'./extractResume'", JSON.stringify(extraction)).replace("'./technicalAnalysis'",JSON.stringify(technical));
 const { buildAuditReport } = await import(`data:text/javascript;base64,${Buffer.from(compiled).toString('base64')}`);
 const resume = `Alex Example
 alex@example.com | +1 (415) 555-0198
@@ -26,6 +27,14 @@ ${'Implemented automated validation and maintained firmware documentation to sup
 const file = new File([resume], 'Alex Example - Embedded Developer.txt');
 const analyze = (text, error = null) => buildAuditReport(file, { plainText:text, pageCount:null, extractError:error });
 const strong = analyze(resume);
+const {lexicalMetrics,percentage} = await import(technical);
+assert.deepEqual(lexicalMetrics(''),{tokens:0,uniqueTokens:0,diversity:0});
+assert.equal(lexicalMetrics('Python Python C++').uniqueTokens,2);
+assert.equal(percentage(1,4),25);
+assert.equal(percentage(0,0),0);
+assert.equal(strong.technical.quantifiedDensity,percentage(3,strong.technical.passages));
+assert.equal(strong.technical.evidenceCoverage,percentage(strong.technical.appliedSkills,strong.technical.detectedSkills));
+assert.ok(strong.technical.diversity>0 && strong.technical.diversity<=100);
 assert.equal(strong.achievementCount, 3);
 assert.ok(strong.score >= 90);
 assert.equal(strong.categories.reduce((n,c) => n+c.possible,0),100);

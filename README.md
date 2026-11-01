@@ -42,6 +42,12 @@ No automatic email, Google Drive, or Google Sheets delivery is enabled. The priv
 
 ## Reliability and abuse controls
 
-The UI retries temporary save failures up to three times, reusing a random submission ID so retried saves do not duplicate records. A failed save remains visible with a manual retry; it is not queued once the page closes. Collection requires explicit consent, same-origin requests, valid file signatures and bounded payload size. Database counters limit saves to 10 per connecting IP per hour and 100 globally per day. The trusted Netlify connecting-IP header is hashed before rate limiting. Deploy behind Netlify; configure an equivalent trusted IP source if migrating elsewhere. Operators should add bot protection before high-volume promotion.
+The UI retries temporary save failures up to three times, reusing a random submission ID so retried saves do not duplicate records. A failed save remains visible with a manual retry; it is not queued once the page closes. Collection requires explicit consent, same-origin requests, valid file signatures and bounded payload size. Database counters limit saves to 10 per connecting IP per hour and 100 globally per day. The trusted connecting-IP header from the detected Vercel or Netlify platform is hashed before rate limiting. Other platforms need their own trusted IP configuration. Operators should add bot protection before high-volume promotion.
 
 No free service can promise failure-free operation. Track hosting credits, database capacity and connection health; keep recoverable backups according to your privacy and retention needs.
+
+## Analysis motion and diagnostics
+
+The analysis view displays validated pipeline progress, per-page PDF parsing, lexical token counts and elapsed time. Brief transitions keep each completed stage readable; the percentage is stage completion, not a time prediction. A CSS 3D scanner, score count-up and card motion respect reduced-motion preferences.
+
+The calculation trace shows category contributions, type-token ratio, action density, quantified-evidence density and contextual skill coverage with their actual numerators and denominators. These diagnostics add no hidden score bonus.

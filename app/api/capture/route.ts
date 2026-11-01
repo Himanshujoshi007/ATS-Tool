@@ -1,7 +1,7 @@
 import { Binary, MongoServerError } from 'mongodb';
 import { createHash, createHmac } from 'node:crypto';
 import { getDatabase, storageConfigured } from '@/lib/mongodb';
-import { CONSENT_VERSION, extractContact, MAX_RESUME_BYTES, validSignature } from '@/lib/submissions';
+import { CONSENT_VERSION, connectingIp, extractContact, MAX_RESUME_BYTES, validSignature } from '@/lib/submissions';
 import { buildAuditReport } from '@/lib/auditAnalysis';
 export const runtime = 'nodejs';
 const json = (data: object, status = 200) => Response.json(data,{status,headers:{'Cache-Control':'no-store'}});
@@ -35,8 +35,8 @@ export async function POST(request: Request) {
     if(existing) return existing.digest === digest ? json({saved:true,submissionId:id}) : json({error:'Submission ID conflict.'},409);
     const counters = db.collection<{_id:string; count:number; expiresAt:Date}>('ats_limits');
     await counters.createIndex({expiresAt:1},{expireAfterSeconds:0});
-    // Netlify supplies its trusted connecting-IP header. Do not use client-controlled forwarded-for.
-    const ip = request.headers.get('x-nf-client-connection-ip') || (process.env.NODE_ENV === 'development' ? 'development' : 'unknown');
+    // Trust only the IP header supplied by the detected hosting platform.
+    const ip = connectingIp(request);
     const ipHash = createHmac('sha256',process.env.ADMIN_TOKEN!).update(ip).digest('hex');
     const hour = new Date().toISOString().slice(0,13);
     const day = hour.slice(0,10);

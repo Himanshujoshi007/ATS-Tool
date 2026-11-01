@@ -3,12 +3,14 @@ export type ExtractResult = {
   pageCount: number | null;
   extractError: string | null;
 };
+export type ExtractionProgress = { completed: number; total: number; label: string };
+type ProgressCallback = (progress: ExtractionProgress) => void;
 
 function normalizeText(raw: string): string {
   return raw.replace(/\r\n?/g, '\n').split('\n').map(line => line.replace(/[^\S\n]+/g, ' ').trim()).filter(Boolean).join('\n');
 }
 
-async function extractPdf(file: File): Promise<{ text: string; pages: number }> {
+async function extractPdf(file: File, onProgress?: ProgressCallback): Promise<{ text: string; pages: number }> {
   const pdfjs = await import('pdfjs-dist');
   const buf = await file.arrayBuffer();
   pdfjs.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
@@ -34,6 +36,7 @@ async function extractPdf(file: File): Promise<{ text: string; pages: number }> 
       }
     }
     full += '\n';
+    onProgress?.({completed:i,total:pdf.numPages,label:`PDF text layer · page ${i} of ${pdf.numPages}`});
   }
   return { text: normalizeText(full), pages: pdf.numPages };
 }
@@ -60,19 +63,21 @@ export function estimatePageCount(wordCount: number): number {
   return Math.min(5, Math.max(1, Math.ceil(wordCount / 450)));
 }
 
-export async function extractResumeFile(file: File): Promise<ExtractResult> {
+export async function extractResumeFile(file: File, onProgress?: ProgressCallback): Promise<ExtractResult> {
   const name = file.name.toLowerCase();
   try {
     if (name.endsWith('.pdf')) {
-      const { text, pages } = await extractPdf(file);
+      const { text, pages } = await extractPdf(file, onProgress);
       return { plainText: text, pageCount: pages, extractError: null };
     }
     if (name.endsWith('.docx')) {
       const text = await extractDocx(file);
+      onProgress?.({completed:1,total:1,label:'DOCX text extraction complete'});
       return { plainText: text, pageCount: null, extractError: null };
     }
     if (name.endsWith('.txt')) {
       const text = normalizeText(await file.text());
+      onProgress?.({completed:1,total:1,label:'Plain-text decoding complete'});
       return { plainText: text, pageCount: null, extractError: null };
     }
     if (name.endsWith('.doc')) {

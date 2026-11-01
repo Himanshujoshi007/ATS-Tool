@@ -1,12 +1,14 @@
 import type { ExtractResult } from './extractResume';
 import { estimatePageCount } from './extractResume';
+import { lexicalMetrics, percentage, type LexicalMetrics } from './technicalAnalysis';
 export type AuditItemStatus = 'pass' | 'fail';
 export type AuditItem = { title: string; status: AuditItemStatus; lines: string[]; earned?: number; possible?: number };
 export type AuditSections = { documentSynopsis: AuditItem[]; dataIdentification: AuditItem[]; lexicalAnalysis: AuditItem[]; semanticAnalysis: AuditItem[] };
 export type FeedbackCard = { type: 'success' | 'error' | 'warning'; title: string; desc: string };
 export type PdfSemanticCharts = { softLabels: string[]; hardLabels: string[]; softCount: number; hardCount: number; ratio: number; ratioInRange: boolean };
 export type ScoreCategory = { name: string; earned: number; possible: number; explanation: string };
-export type AuditReportPayload = { reportId: string; score: number; fileName: string; plainText: string; extractError: string | null; sections: AuditSections; feedback: FeedbackCard[]; pdfSemantic: PdfSemanticCharts; categories: ScoreCategory[]; wordCount: number; achievementCount: number; assessable: boolean };
+export type TechnicalMetrics = LexicalMetrics & { passages: number; actionPassages: number; actionDensity: number; quantifiedDensity: number; appliedSkills: number; detectedSkills: number; evidenceCoverage: number; rawCharacters: number };
+export type AuditReportPayload = { reportId: string; score: number; fileName: string; plainText: string; extractError: string | null; sections: AuditSections; feedback: FeedbackCard[]; pdfSemantic: PdfSemanticCharts; categories: ScoreCategory[]; wordCount: number; achievementCount: number; assessable: boolean; technical: TechnicalMetrics };
 
 const HARD = ['python','java','javascript','typescript','react','node.js','sql','aws','azure','docker','linux','git','c++','c#','go','rust','html','css','mongodb','postgresql','excel','tableau','power bi','matlab','autocad','figma','jira','agile','scrum','ci/cd','machine learning','tensorflow','pytorch','embedded c','autosar','rtos','can','spi','i2c','uart','verilog','firmware','salesforce','google analytics','seo','crm','patient care','hipaa','ehr','emr','medical coding','care coordination','epic','cerner','icd-10','budgeting','forecasting','accounting','recruitment','supply chain','inventory management','project management'];
 const SOFT = ['leadership','communication','collaboration','teamwork','mentoring','coaching','negotiation','problem solving','problem-solving','stakeholder management','customer service'];
@@ -14,7 +16,7 @@ const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 function skills(text: string, list: string[]) { return list.filter(skill => skill === 'go' ? /\b(?:Go(?!-)|[Gg]olang)\b/.test(text) : skill === 'can' ? /\bCAN\b/.test(text) : new RegExp(`(?<![a-z0-9+#])${escape(skill)}(?![a-z0-9+#])`, 'i').test(text)); }
 const action = /\b(?:achieved|automated|built|created|delivered|developed|designed|decreased|improved|increased|implemented|led|managed|optimized|reduced|resolved|saved|supported|coordinated|streamlined|launched|maintained|integrated)\b/i;
 const metric = /(?:\b\d+(?:[,.]\d+)*\s*(?:%|percent\b|users\b|patients\b|customers\b|hours\b|days\b|minutes\b|seconds\b|teams\b|projects\b|transactions\b|records\b|applications\b|devices\b|ms\b)|[$£€]\s*\d[\d,.]*)/i;
-export function buildAuditReport(file: File, extracted: ExtractResult): AuditReportPayload {
+export function buildAuditReport(file: File, extracted: ExtractResult, lexical?: LexicalMetrics): AuditReportPayload {
   const text = extracted.plainText.trim();
   const words = text.split(/\s+/).filter(w => /[\p{L}\p{N}]/u.test(w));
   const wordCount = words.length;
@@ -79,5 +81,6 @@ export function buildAuditReport(file: File, extracted: ExtractResult): AuditRep
   const feedback: FeedbackCard[] = assessable ? priorities.slice(0, 3).map(i => ({ type: 'warning', title: i.title, desc: `${i.lines.join(' ')} (${i.earned}/${i.possible} points)` })) : [{ type: 'error', title: 'Readable text needed', desc: extracted.extractError || 'We need at least 50 readable words before calculating a useful audit.' }];
   if (assessable && !priorities.length) feedback.push({ type: 'success', title: 'Strong fundamentals', desc: 'All checks in this audit passed. Review the resume against each job description before applying.' });
   const ratio = soft.length ? hard.length / soft.length : hard.length;
-  return { reportId: `RP-${crypto.randomUUID().slice(0, 8).toUpperCase()}`, score, fileName: file.name, plainText: text, extractError: extracted.extractError, assessable, wordCount, achievementCount: achievements.length, categories, sections: { documentSynopsis, dataIdentification, lexicalAnalysis, semanticAnalysis }, feedback, pdfSemantic: { softLabels: soft, hardLabels: hard, softCount: soft.length, hardCount: hard.length, ratio: Math.round(ratio * 100) / 100, ratioInRange: true } };
+  const technical: TechnicalMetrics = { ...(lexical ?? lexicalMetrics(text)), passages: chunks.length, actionPassages: actionCount, actionDensity: percentage(actionCount, chunks.length), quantifiedDensity: percentage(achievements.length, chunks.length), appliedSkills: evidence.length, detectedSkills: hard.length, evidenceCoverage: percentage(evidence.length, hard.length), rawCharacters: text.length };
+  return { reportId: `RP-${crypto.randomUUID().slice(0, 8).toUpperCase()}`, score, technical, fileName: file.name, plainText: text, extractError: extracted.extractError, assessable, wordCount, achievementCount: achievements.length, categories, sections: { documentSynopsis, dataIdentification, lexicalAnalysis, semanticAnalysis }, feedback, pdfSemantic: { softLabels: soft, hardLabels: hard, softCount: soft.length, hardCount: hard.length, ratio: Math.round(ratio * 100) / 100, ratioInRange: true } };
 }

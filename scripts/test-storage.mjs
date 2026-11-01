@@ -8,11 +8,11 @@ import { MongoClient } from 'mongodb';
 const root = new URL('../',import.meta.url);
 const temp = new URL('../test-fixtures/storage-modules/',import.meta.url);
 mkdirSync(temp,{recursive:true});
-const files = ['lib/mongodb.ts','lib/submissions.ts','lib/extractResume.ts','lib/auditAnalysis.ts','app/api/capture/route.ts','app/api/storage-status/route.ts','app/api/admin/resumes/route.ts','app/api/admin/resumes/[id]/route.ts'];
+const files = ['lib/mongodb.ts','lib/submissions.ts','lib/extractResume.ts','lib/technicalAnalysis.ts','lib/auditAnalysis.ts','app/api/capture/route.ts','app/api/storage-status/route.ts','app/api/admin/resumes/route.ts','app/api/admin/resumes/[id]/route.ts'];
 const target = path => new URL(path.replaceAll('/','_').replace('.ts','.mjs'),temp).href;
 for(const path of files) {
  let js = ts.transpileModule(readFileSync(new URL(path,root),'utf8'),{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022}}).outputText;
- js=js.replace(/from ['"](@\/lib\/[^'"]+|\.\/extractResume|mongodb)['"]/g,(_,name)=>`from ${JSON.stringify(name==='mongodb'?import.meta.resolve('mongodb'):target(name==='./extractResume'?'lib/extractResume.ts':name.replace('@/','')+'.ts'))}`);
+ js=js.replace(/from ['"](@\/lib\/[^'"]+|\.\/extractResume|\.\/technicalAnalysis|mongodb)['"]/g,(_,name)=>`from ${JSON.stringify(name==='mongodb'?import.meta.resolve('mongodb'):target(name.startsWith('./')?'lib/'+name.slice(2)+'.ts':name.replace('@/','')+'.ts'))}`);
  writeFileSync(fileURLToPath(target(path)),js);
 }
 const server = await MongoMemoryServer.create();
@@ -20,7 +20,8 @@ process.env.MONGODB_URI=server.getUri();process.env.MONGODB_DB='ats_test';proces
 const {POST} = await import(target('app/api/capture/route.ts'));
 const {GET:list} = await import(target('app/api/admin/resumes/route.ts'));
 const {GET:download} = await import(target('app/api/admin/resumes/[id]/route.ts'));
-const {csvCell} = await import(target('lib/submissions.ts'));
+const {csvCell,connectingIp} = await import(target('lib/submissions.ts'));
+const {GET:storageStatus} = await import(target('app/api/storage-status/route.ts'));
 const client=await new MongoClient(server.getUri()).connect();const db=client.db('ats_test');
 const text=readFileSync(new URL('../test-fixtures/Alex Example - Embedded Developer.txt',import.meta.url),'utf8');
 const file=new File([text],'Alex Example - Embedded Developer.txt');
@@ -29,6 +30,10 @@ function req(id=randomUUID(),consent='resume-review-v1',origin='http://localhost
  return new Request('http://localhost:3100/api/capture',{method:'POST',body,headers:{Origin:origin,'x-nf-client-connection-ip':'192.0.2.1'}});
 }
 try {
+ assert.equal((await (await storageStatus()).json()).enabled,true);
+ const oldPlatform=process.env.VERCEL; process.env.VERCEL='1';
+ assert.equal(connectingIp(new Request('https://example.test',{headers:{'x-forwarded-for':'192.0.2.10','x-nf-client-connection-ip':'spoofed'}})),'192.0.2.10');
+ if(oldPlatform===undefined)delete process.env.VERCEL;else process.env.VERCEL=oldPlatform;
  assert.equal((await POST(req(randomUUID(),'no'))).status,400);
  assert.equal((await POST(req(randomUUID(),'resume-review-v1','https://other.example'))).status,403);
  assert.equal((await POST(req(randomUUID(),'resume-review-v1','http://localhost:3100',new File(['not a pdf'],'bad.pdf')))).status,400);

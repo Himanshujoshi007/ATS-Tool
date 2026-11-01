@@ -1,6 +1,11 @@
 import { createHash, timingSafeEqual } from 'node:crypto';
 export const MAX_RESUME_BYTES = 3 * 1024 * 1024;
 export const CONSENT_VERSION = 'resume-review-v1';
+export function connectingIp(request: Request) {
+  if (process.env.VERCEL === '1') return request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
+  if (process.env.NETLIFY === 'true') return request.headers.get('x-nf-client-connection-ip') || 'unknown';
+  return process.env.NODE_ENV === 'development' ? 'development' : 'unknown';
+}
 export function authorized(request: Request) {
   const token = process.env.ADMIN_TOKEN;
   if (!token || token.length < 32) return false;
