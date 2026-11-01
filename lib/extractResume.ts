@@ -5,13 +5,13 @@ export type ExtractResult = {
 };
 
 function normalizeText(raw: string): string {
-  return raw.replace(/\s+/g, ' ').trim();
+  return raw.replace(/\r\n?/g, '\n').split('\n').map(line => line.replace(/[^\S\n]+/g, ' ').trim()).filter(Boolean).join('\n');
 }
 
 async function extractPdf(file: File): Promise<{ text: string; pages: number }> {
   const pdfjs = await import('pdfjs-dist');
   const buf = await file.arrayBuffer();
-  pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.mjs`;
+  pdfjs.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
 
   const loadingTask = pdfjs.getDocument({ data: buf });
   const pdf = await loadingTask.promise;
@@ -19,8 +19,21 @@ async function extractPdf(file: File): Promise<{ text: string; pages: number }> 
   for (let i = 1; i <= pdf.numPages; i++) {
     const page = await pdf.getPage(i);
     const content = await page.getTextContent();
-    const strings = content.items.map((item) => ('str' in item ? item.str : '') || '');
-    full += strings.join(' ') + '\n';
+    let previousY: number | null = null;
+    for (const item of content.items) {
+      if (!('str' in item)) continue;
+      const y = item.transform[5];
+      if (previousY !== null && Math.abs(y - previousY) > 3) full += '\n';
+      full += item.str + (item.hasEOL ? '\n' : ' ');
+      previousY = y;
+    }
+    const annotations = await page.getAnnotations();
+    for (const annotation of annotations) {
+      if (annotation.subtype === 'Link' && typeof annotation.url === 'string' && /^(?:https?:\/\/(?:www\.)?linkedin\.com\/in\/|mailto:)/i.test(annotation.url)) {
+        full += '\n' + annotation.url.replace(/^mailto:/i, '') + '\n';
+      }
+    }
+    full += '\n';
   }
   return { text: normalizeText(full), pages: pdf.numPages };
 }

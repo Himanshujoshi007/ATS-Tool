@@ -36,3 +36,9 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+/test-fixtures/
+/.netlify/
+!/.env.example
+
+# Generated from the installed pdfjs version during builds
+/public/pdf.worker.min.mjs

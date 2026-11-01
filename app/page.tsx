@@ -1,314 +1,97 @@
 'use client';
-
-import React, { useState, useRef, useMemo, useEffect } from 'react';
-import { motion, AnimatePresence, useMotionValue, useSpring, useTransform } from 'framer-motion';
-import { 
-  Upload, CheckCircle2, AlertTriangle, XCircle, 
-  RefreshCw, Award, Download 
-} from 'lucide-react';
-import type { AuditReportPayload, FeedbackCard } from '@/lib/auditAnalysis';
-import { buildAuditReport } from '@/lib/auditAnalysis';
+import { useEffect, useRef, useState, type DragEvent, type PointerEvent } from 'react';
+import Link from 'next/link';
+import { ArrowUpRight, ArrowRight, Upload, FileText, Check, CheckCircle2, ChevronDown, Download, RotateCcw, ShieldCheck, Sparkles, Layers3, ScanLine, X, LoaderCircle } from 'lucide-react';
+import { buildAuditReport, type AuditReportPayload } from '@/lib/auditAnalysis';
 import { extractResumeFile } from '@/lib/extractResume';
 import { downloadAuditPdf } from '@/lib/generateAuditPdf';
+import { recognizeFormat, type FormatRecognition } from '@/lib/recognizeFormat';
 
-// MarqueeLine component moved outside to fix lint error
-function MarqueeLine({ reverse = false, speed = 100, opacity = 0.05 }: { reverse?: boolean; speed?: number; opacity?: number }) {
-  const techGiants = ["Google", "Apple", "Microsoft", "Amazon", "Meta", "Tesla", "Netflix", "IBM", "Stripe", "OpenAI", "Nvidia", "Adobe", "Shopify", "SpaceX", "Oracle", "Cisco", "Intel", "Qualcomm"];
-  return (
-    <div className="flex overflow-hidden whitespace-nowrap select-none pointer-events-none mb-10">
-      <motion.div 
-        initial={{ x: reverse ? "-50%" : "0%" }}
-        animate={{ x: reverse ? "0%" : "-50%" }}
-        transition={{ duration: speed, repeat: Infinity, ease: "linear" }}
-        className="flex gap-32 items-center pr-32"
-        style={{ opacity }}
-      >
-        {[...techGiants, ...techGiants, ...techGiants].map((c, i) => (
-          <span key={i} className="text-[8rem] font-black italic tracking-tighter">{c.toUpperCase()}</span>
-        ))}
-      </motion.div>
-    </div>
-  );
+function ResumeSculpture() {
+  function tilt(e: PointerEvent<HTMLDivElement>) {
+    if (e.pointerType !== 'mouse') return;
+    const r = e.currentTarget.getBoundingClientRect();
+    e.currentTarget.style.setProperty('--rx', `${-(e.clientY - r.top - r.height / 2) / 32}deg`);
+    e.currentTarget.style.setProperty('--ry', `${(e.clientX - r.left - r.width / 2) / 26}deg`);
+  }
+  return <div className="sculpture" onPointerMove={tilt} onPointerLeave={e => { e.currentTarget.style.setProperty('--rx', '0deg'); e.currentTarget.style.setProperty('--ry', '0deg'); }} aria-hidden="true">
+    <div className="orbit orbit-one"/><div className="orbit orbit-two"/><div className="sculpture-shadow"/>
+    <div className="document-stack"><div className="paper paper-back"/><div className="paper paper-middle"/><div className="paper paper-front"><div className="paper-top"><span className="paper-avatar"/><span className="paper-stamp"><Check size={14}/></span></div><div className="paper-name"/><div className="paper-role"/><div className="paper-rule"/>{[0,1,2].map(n => <div className="paper-section" key={n}><b/>{[0,1,2].map(i => <span key={i}/>)}</div>)}<div className="paper-chips"><i/><i/><i/></div></div><div className="floating-check"><ShieldCheck size={22}/><div>Built to stand out<span>Ready for your next move</span></div></div></div>
+    <div className="small-orb"/><div className="glass-label"><ScanLine size={16}/> A clearer picture of your potential</div>
+  </div>;
 }
-
 export default function ResumeChecker() {
-  // File state kept for potential future use
-  const [_file, setFile] = useState<File | null>(null);
-  const [status, setStatus] = useState<'idle' | 'scanning' | 'results'>('idle');
-  const [scanStep, setScanStep] = useState('');
-  const [report, setReport] = useState<AuditReportPayload | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const targetResumeCount = useMemo(
-    () => 750,
-    []
-  );
-  const [resumeCount, setResumeCount] = useState(0);
-
-  useEffect(() => {
-    const durationMs = 2800;
-    const easeOutExpo = (t: number) =>
-      t >= 1 ? 1 : 1 - 2 ** (-10 * t);
-    const start = performance.now();
-    let raf = 0;
-    const tick = (now: number) => {
-      const t = Math.min(1, (now - start) / durationMs);
-      const eased = easeOutExpo(t);
-      setResumeCount(Math.round(eased * targetResumeCount));
-      if (t < 1) {
-        raf = requestAnimationFrame(tick);
-      } else {
-        setResumeCount(targetResumeCount);
-      }
-    };
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
-  }, [targetResumeCount]);
-
-  // --- 3D TILT EFFECT LOGIC ---
-  const x = useMotionValue(0);
-  const y = useMotionValue(0);
-  const mouseXSpring = useSpring(x);
-  const mouseYSpring = useSpring(y);
-  const rotateX = useTransform(mouseYSpring, [-0.5, 0.5], ["12deg", "-12deg"]);
-  const rotateY = useTransform(mouseXSpring, [-0.5, 0.5], ["-12deg", "12deg"]);
-
-  const handleMouseMove = (e: React.MouseEvent<HTMLElement>) => {
-    const rect = e.currentTarget.getBoundingClientRect();
-    const xPct = (e.clientX - rect.left) / rect.width - 0.5;
-    const yPct = (e.clientY - rect.top) / rect.height - 0.5;
-    x.set(xPct);
-    y.set(yPct);
-  };
-
-  const handleMouseLeave = () => {
-    x.set(0);
-    y.set(0);
-  };
-
-  const simulateScan = async (selectedFile: File) => {
-    setStatus('scanning');
-    setFile(selectedFile);
-    
-    const steps = [
-      'Initializing Neural Parser...',
-      'Executing LSA Analysis...',
-      'Tokenizing Section Nodes...',
-      'Finalizing AI Diagnostic...',
-    ];
-
-    // --- NEW: BACKEND CAPTURE LOGIC ---
-    // This part sends the file to your Node.js Brain while the animation plays
-    const captureData = async () => {
+  const input = useRef<HTMLInputElement>(null);
+  const busy = useRef(false);
+  const [status, setStatus] = useState<'idle'|'scanning'|'results'>('idle');
+  const [report, setReport] = useState<AuditReportPayload|null>(null);
+  const [format, setFormat] = useState<FormatRecognition|null>(null);
+  const [error, setError] = useState('');
+  const [dragging, setDragging] = useState(false);
+  const [step, setStep] = useState('Reading your document');
+  const [exporting, setExporting] = useState(false);
+  const [storageEnabled, setStorageEnabled] = useState(false);
+  const [saveConsent, setSaveConsent] = useState(false);
+  const [saveState, setSaveState] = useState<'idle'|'saving'|'saved'|'failed'>('idle');
+  const pendingSave = useRef<{file:File; text:string; id:string}|null>(null);
+  useEffect(() => { void fetch('/api/storage-status').then(r=>r.json()).then(data=>setStorageEnabled(data.enabled === true)).catch(()=>setStorageEnabled(false)); }, []);
+  async function saveResume() {
+    const submission = pendingSave.current;
+    if(!submission) return;
+    setSaveState('saving');
+    for(let attempt = 0; attempt < 3; attempt++) {
       try {
-        const formData = new FormData();
-        formData.append('resume', selectedFile);
-        formData.append('name', selectedFile.name.split('-')[0] || "Candidate"); // Guessing name from filename
-        formData.append('score', '0');
-
-        const response = await fetch('/api/capture', {
-          method: 'POST',
-          body: formData,
-        });
-        
+        const data = new FormData(); data.append('resume',submission.file); data.append('text',submission.text); data.append('submissionId',submission.id); data.append('consent','resume-review-v1');
+        const response = await fetch('/api/capture',{method:'POST',body:data,signal:AbortSignal.timeout(20000)});
         const result = await response.json();
-        console.log("🚀 Data captured by Brain:", result);
-      } catch (err) {
-        console.error("❌ Brain communication failed:", err);
-      }
-    };
-
-    // Start the capture in the background
-    captureData();
-
-    // The rest of your existing animation logic
-    const extractionPromise = extractResumeFile(selectedFile);
-    for (const step of steps) {
-      setScanStep(step);
-      await new Promise((r) => setTimeout(r, 1100));
+        if(response.ok && result.saved) { setSaveState('saved'); pendingSave.current = null; return; }
+        if(response.status < 500) break;
+      } catch { /* Keep the same submission ID: retries cannot create duplicate records. */ }
+      if(attempt < 2) await new Promise(resolve=>setTimeout(resolve,1000 * (attempt + 1)));
     }
-    const extracted = await extractionPromise;
-    const finalReport = buildAuditReport(selectedFile, extracted);
-    setReport(finalReport);
-    setStatus('results');
-  };
-
-  const handleDownloadReport = () => {
-    if (!report) return;
-    downloadAuditPdf(report, report.fileName);
-  };
-
-  return (
-    <div className="min-h-screen bg-black text-white overflow-hidden relative selection:bg-yellow-500/30">
-      
-      {/* --- REFINED 6-LAYER BACKGROUND --- */}
-      <div className="absolute inset-0 z-0 flex flex-col justify-center">
-        <MarqueeLine speed={100} opacity={0.05} />
-        <MarqueeLine reverse speed={130} opacity={0.03} />
-        <MarqueeLine speed={90} opacity={0.06} />
-        <MarqueeLine reverse speed={150} opacity={0.04} />
-        <MarqueeLine speed={120} opacity={0.05} />
-        <MarqueeLine reverse speed={140} opacity={0.02} />
-      </div>
-
-      {/* --- NAVIGATION --- */}
-      <nav className="relative z-50 bg-black/95 backdrop-blur-2xl border-b border-white/5 px-8 py-5 flex justify-between items-center">
-        <motion.div 
-            style={{ rotateX, rotateY, transformStyle: "preserve-3d" }}
-            onMouseMove={handleMouseMove}
-            onMouseLeave={handleMouseLeave}
-            className="flex items-center gap-3 font-black text-2xl cursor-pointer group"
-        >
-          <div className="w-10 h-10 bg-yellow-500 rounded-lg flex items-center justify-center text-black shadow-[0_0_25px_rgba(234,179,8,0.6)] group-hover:scale-110 transition-all">R</div>
-          <span className="tracking-tighter">Resume<span className="text-yellow-500">Pro</span></span>
-        </motion.div>
-        
-        <motion.a
-            href="https://wa.me/917016193407"
-            target="_blank"
-            rel="noopener noreferrer"
-            whileHover={{ scale: 1.05, boxShadow: "0 0 30px rgba(234,179,8,0.5)" }}
-            whileTap={{ scale: 0.95, y: 5 }}
-            className="bg-yellow-500 text-black px-10 py-3.5 rounded-2xl font-black text-sm shadow-[0_10px_0_0_#854d0e] transition-all hover:-translate-y-1 inline-block"
-        >
-          CONNECT WITH CV EXPERT
-        </motion.a>
-      </nav>
-
-      <main className="relative z-10 max-w-6xl mx-auto px-6 py-10">
-        <AnimatePresence mode="wait">
-          {status === 'idle' && (
-            <motion.div 
-              key="idle"
-              initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.98 }}
-              className="text-center"
-            >
-              {/* --- RESUME / NEURAL AUDIT STRIP --- */}
-              <motion.div 
-                initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }}
-                className="inline-flex items-center justify-center bg-white/[0.03] border border-white/10 px-8 py-3 rounded-full mb-10 backdrop-blur-3xl shadow-[0_10px_30px_rgba(0,0,0,0.5)] border-t-blue-500/20"
-              >
-                <span className="text-xs font-black tracking-[0.2em] text-slate-300">
-                  Total Resume Count --{' '}
-                  <motion.span
-                    className="text-white text-base tracking-normal tabular-nums inline-block origin-center mr-5 md:mr-7"
-                    animate={{
-                      scale: [1, 1.12, 1, 1.08, 1],
-                      opacity: [1, 0.88, 1, 0.92, 1],
-                    }}
-                    transition={{
-                      duration: 1.15,
-                      repeat: Infinity,
-                      ease: 'easeInOut',
-                      times: [0, 0.12, 0.22, 0.38, 1],
-                    }}
-                  >
-                    {resumeCount.toLocaleString()}
-                  </motion.span>
-                  NEURAL AUDITS PROCESSED
-                </span>
-              </motion.div>
-
-              <h1 className="text-7xl md:text-9xl font-black mb-10 tracking-tighter leading-none italic drop-shadow-2xl">
-                Beat the <span className="text-yellow-500">ATS.</span>
-              </h1>
-              
-              <motion.div 
-                style={{ rotateX, rotateY, transformStyle: "preserve-3d" }}
-                onMouseMove={handleMouseMove}
-                onMouseLeave={handleMouseLeave}
-                whileHover={{ backgroundColor: "rgba(255,255,255,0.05)" }}
-                onClick={() => fileInputRef.current?.click()}
-                className="bg-white/[0.02] backdrop-blur-xl border border-white/10 rounded-[4rem] p-32 cursor-pointer group shadow-[0_50px_100px_rgba(0,0,0,0.7)] max-w-4xl mx-auto border-dashed hover:border-yellow-500/40 transition-all duration-700 relative"
-              >
-                <div className="absolute inset-0 bg-yellow-500/[0.03] opacity-0 group-hover:opacity-100 transition-opacity rounded-[4rem]" />
-                <Upload size={120} className="mx-auto mb-10 text-blue-500 group-hover:text-yellow-500 transition-all duration-500 group-hover:-translate-y-6 drop-shadow-[0_0_20px_rgba(59,130,246,0.3)]" />
-                <h3 className="text-5xl font-black text-white mb-4 tracking-tighter uppercase italic leading-tight">Inject Professional File</h3>
-                <p className="text-slate-500 font-bold tracking-[0.5em] text-xs uppercase opacity-70">Boolean Parsing • LSA Logic • USA & Canada</p>
-                <input
-                  type="file"
-                  ref={fileInputRef}
-                  className="hidden"
-                  accept=".pdf,.doc,.docx,.txt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                  onChange={(e) => e.target.files?.[0] && void simulateScan(e.target.files[0])}
-                />
-              </motion.div>
-            </motion.div>
-          )}
-
-          {status === 'scanning' && (
-            <motion.div key="scanning" className="py-40 text-center">
-              <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1.5, ease: "linear" }}>
-                <RefreshCw size={140} className="mx-auto mb-14 text-yellow-500 drop-shadow-[0_0_40px_rgba(234,179,8,0.5)]" />
-              </motion.div>
-              <h2 className="text-6xl font-black text-white tracking-[0.25em] uppercase italic drop-shadow-xl">{scanStep}</h2>
-            </motion.div>
-          )}
-
-          {status === 'results' && report && (
-            <motion.div 
-              key="results"
-              initial={{ opacity: 0, y: 60 }} animate={{ opacity: 1, y: 0 }}
-              className="space-y-16"
-            >
-              <div className="bg-white/[0.04] backdrop-blur-3xl rounded-[3rem] p-14 flex flex-col md:flex-row justify-between items-center border border-white/10 shadow-3xl border-l-[20px] border-l-yellow-500">
-                <div>
-                  <h2 className="text-6xl font-black text-white tracking-tighter uppercase italic leading-none">Diagnostic Locked</h2>
-                  <p className="text-yellow-500 font-black tracking-[0.3em] uppercase mt-8 text-xl opacity-80">{report.fileName}</p>
-                </div>
-                <div className="flex gap-8 mt-10 md:mt-0">
-                  <motion.button 
-                    whileHover={{ scale: 1.05, boxShadow: "0 0 40px rgba(234,179,8,0.5)" }}
-                    whileTap={{ scale: 0.95, y: 6 }}
-                    onClick={handleDownloadReport} 
-                    className="bg-yellow-500 text-black px-14 py-6 rounded-3xl font-black flex items-center gap-5 shadow-[0_12px_0_0_#854d0e] transition-all"
-                  >
-                    <Download size={28}/> EXPORT AUDIT
-                  </motion.button>
-                  <button onClick={() => setStatus('idle')} className="bg-white/5 px-12 py-6 rounded-3xl font-bold hover:bg-white/10 transition-all border border-white/10 uppercase tracking-widest text-sm italic">New Diagnostic</button>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-16">
-                <motion.div 
-                    style={{ rotateX, rotateY, transformStyle: "preserve-3d" }}
-                    onMouseMove={handleMouseMove}
-                    onMouseLeave={handleMouseLeave}
-                    className="bg-white/[0.02] backdrop-blur-2xl p-20 rounded-[4rem] flex flex-col items-center justify-center border border-white/10 shadow-2xl relative overflow-hidden group min-h-[450px]"
-                >
-                  <div className="absolute inset-0 bg-yellow-500/[0.02] opacity-0 group-hover:opacity-100 transition-opacity" />
-                  <h3 className="text-slate-500 font-black uppercase tracking-[0.6em] text-[0.7rem] mb-14 italic">Neural Match Index</h3>
-                  <div className="text-[12rem] leading-none font-black text-yellow-500 drop-shadow-[0_0_60px_rgba(234,179,8,0.4)] tracking-tighter relative z-10">{report.score}</div>
-                </motion.div>
-                
-                <div className="lg:col-span-2 bg-white/[0.02] backdrop-blur-2xl p-16 rounded-[4rem] border border-white/10 shadow-2xl">
-                  <h3 className="text-yellow-500 font-black uppercase tracking-widest mb-14 flex items-center gap-8 text-4xl italic underline underline-offset-[12px] decoration-white/10"><Award size={48}/> Semantic Logic Log</h3>
-                  <div className="space-y-10">
-                    {report.feedback.map((f: FeedbackCard, i: number) => (
-                      <motion.div 
-                        whileHover={{ x: 20, backgroundColor: "rgba(255,255,255,0.05)" }}
-                        key={i} className="flex gap-10 p-10 rounded-[2.5rem] border border-white/5 bg-white/0 transition-all cursor-default group"
-                      >
-                        {f.type === 'error' ? (
-                          <XCircle size={48} className="text-red-500 shrink-0 group-hover:scale-110 transition-transform" />
-                        ) : f.type === 'warning' ? (
-                          <AlertTriangle size={48} className="text-amber-500 shrink-0 group-hover:scale-110 transition-transform" />
-                        ) : (
-                          <CheckCircle2 size={48} className="text-green-500 shrink-0 group-hover:scale-110 transition-transform" />
-                        )}
-                        <div>
-                          <p className="font-black text-white text-3xl uppercase tracking-tighter mb-3 italic leading-tight">{f.title}</p>
-                          <p className="text-slate-400 font-medium leading-relaxed text-xl opacity-90">{f.desc}</p>
-                        </div>
-                      </motion.div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </main>
-    </div>
-  );
+    setSaveState('failed');
+  }
+  async function scan(file: File) {
+    if (busy.current) return;
+    setError('');
+    if (!/\.(pdf|docx|txt)$/i.test(file.name)) { setError('Please choose a PDF, DOCX or TXT file. Convert older DOC files to DOCX first.'); return; }
+    if (file.size > 3 * 1024 * 1024 || file.size === 0) { setError('Choose a non-empty file smaller than 3 MB.'); return; }
+    if (saveState === 'saving') return;
+    setSaveState('idle'); pendingSave.current = null;
+    busy.current = true; setStatus('scanning'); setStep('Reading your document'); setReport(null); setFormat(null);
+    try {
+      const extracted = await extractResumeFile(file);
+      if (extracted.extractError || extracted.plainText.split(/\s+/).filter(Boolean).length < 50) throw new Error(extracted.extractError || 'Not enough readable text. Upload a text-based resume with at least 50 words. Scanned PDFs need OCR first.');
+      setStep('Evaluating structure and evidence');
+      await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
+      setReport(buildAuditReport(file, extracted));
+      setFormat(recognizeFormat(file.name, extracted.plainText, extracted.extractError));
+      setStatus('results');
+      if(saveConsent && storageEnabled) { pendingSave.current = {file,text:extracted.plainText,id:crypto.randomUUID()}; void saveResume(); }
+    } catch (e) { setError(e instanceof Error ? e.message : 'Unable to read this file. Try another PDF or DOCX.'); setStatus('idle'); }
+    finally { busy.current = false; if (input.current) input.current.value = ''; }
+  }
+  function drop(e: DragEvent<HTMLButtonElement>) { e.preventDefault(); setDragging(false); if (e.dataTransfer.files[0]) void scan(e.dataTransfer.files[0]); }
+  async function exportReport() { if (!report || exporting) return; setExporting(true); try { downloadAuditPdf(report, report.fileName); } catch { setError('The report could not be exported. Please try again.'); } finally { setExporting(false); } }
+  const reset = () => { if(saveState === 'saving') return; setStatus('idle'); setError(''); setReport(null); setFormat(null); setSaveState('idle'); pendingSave.current = null; };
+  return <div className="app-shell">
+    <nav className="topbar"><Link href="/" className="brand" aria-label="ResumePro home"><span className="brand-icon"><Layers3 size={22}/></span>Resume<span className="brand-light">Pro</span><span className="beta">STUDIO</span></Link><div className="nav-right"><span className="local-pill"><i/> Resume intelligence</span><a className="expert-link" href="https://wa.me/917016193407" target="_blank" rel="noopener noreferrer">Talk to an expert <ArrowUpRight size={16}/></a></div></nav>
+    <main>
+      {status === 'idle' && <>
+        <section className="hero"><div className="hero-copy"><div className="eyebrow"><span/> YOUR NEXT CHAPTER STARTS HERE</div><h1>Good experience.<br/>Great resume.<br/><span>Better possibilities.</span></h1><p className="hero-description">Turn your experience into a stronger first impression. Get a thoughtful resume audit, clear priorities, and a little more confidence for your next move.</p><div className="hero-actions"><button className="primary-button" onClick={() => input.current?.click()}>Check my resume <ArrowUpRight size={19}/></button><a className="quiet-link" href="#how-it-works">How it works <ArrowRight size={16}/></a></div><div className="hero-facts"><span><ShieldCheck size={15}/> Analyzed on your device</span><span><CheckCircle2 size={15}/> No account needed</span></div></div><ResumeSculpture/></section>
+        <section className="workspace" aria-label="Resume upload"><div className="workspace-heading"><div><span className="kicker">A FRESH PERSPECTIVE</span><h2>Your next opportunity, one upload closer.</h2></div><span className="step-chip">01 / UPLOAD</span></div><button className={`upload-zone ${dragging ? 'dragging' : ''}`} onClick={() => input.current?.click()} onDragOver={e => { e.preventDefault(); setDragging(true); }} onDragLeave={() => setDragging(false)} onDrop={drop}><span className="upload-icon"><Upload size={25}/></span><span className="upload-copy"><strong>Drop your resume here</strong><span>or choose a file from your device</span></span><span className="upload-types">PDF, DOCX, TXT <span>UP TO 3 MB</span></span><span className="upload-arrow"><ArrowUpRight size={22}/></span></button><p className="privacy-line"><ShieldCheck size={13}/> {saveConsent && storageEnabled ? 'With your permission, your resume and extracted contact details are saved privately for up to 90 days for expert review.' : 'Your resume is analyzed on your device. Nothing is saved unless you choose private expert review.'}</p></section>
+        {storageEnabled && <label className="consent-control"><input type="checkbox" checked={saveConsent} onChange={e=>setSaveConsent(e.target.checked)}/><span>Save a private copy for expert review. I agree to storage of my resume, name, email, phone, LinkedIn and education for up to 90 days. <Link href="/privacy">Privacy details</Link></span></label>}<section id="how-it-works" className="how-grid">{[{n:'01',icon:<FileText size={20}/>,title:'Bring your experience',text:'Upload your current resume. A text-based PDF or Word document works best.'},{n:'02',icon:<ScanLine size={20}/>,title:'Get a clearer view',text:'Explore six scoring areas, from structure and clarity to evidence of your impact.'},{n:'03',icon:<Sparkles size={20}/>,title:'Make your next move',text:'Focus on the most valuable improvements and take your detailed report with you.'}].map(c => <article key={c.n}><div className="how-top">{c.icon}<span>{c.n}</span></div><h3>{c.title}</h3><p>{c.text}</p></article>)}</section>
+      </>}
+      {status === 'scanning' && <section className="scanning glass-panel" aria-live="polite"><div className="scan-symbol"><ScanLine size={48}/></div><span className="eyebrow">A LITTLE CLARITY IS ON ITS WAY</span><h1>{step}</h1><p>Checking the details that make your experience easier to understand.</p><LoaderCircle className="spinner" size={24}/></section>}
+      {status === 'results' && report && <section className="results"><div className="result-header"><div><span className="eyebrow"><span/> YOUR RESUME, IN FOCUS</span><h1>A clearer path forward.</h1><p className="filename"><FileText size={15}/>{report.fileName}</p></div><div className="result-actions"><button className="secondary-button" onClick={reset} disabled={saveState === 'saving'}><RotateCcw size={16}/> New resume</button><button className="primary-button" onClick={() => void exportReport()} disabled={exporting}><Download size={17}/>{exporting ? 'Exporting…' : 'Save report'}</button></div></div>
+        {saveState !== 'idle' && <div className="save-notice" role="status"><ShieldCheck size={18}/><span>{saveState === 'saving' ? 'Saving your private review copy… Please keep this page open.' : saveState === 'saved' ? 'Your private review copy has been saved.' : 'Private saving was not confirmed. Your audit is ready; retry before leaving this page.'}</span>{saveState === 'failed' && <button className="secondary-button" onClick={()=>void saveResume()}>Retry save</button>}</div>}<div className="overview-grid"><article className="score-card glass-panel"><span className="kicker">RESUME QUALITY</span><div className="score-ring" role="img" aria-label={`${report.score} out of 100 resume quality score`} style={{background:`conic-gradient(var(--yellow) ${report.score * 3.6}deg, #ffffff12 0deg)`}}><div><strong>{report.score}</strong><span>OUT OF 100</span></div></div><h2>{report.score >= 85 ? 'A strong foundation.' : report.score >= 65 ? 'Good potential. Room to grow.' : 'Let’s build a stronger story.'}</h2><p>Based on the content we could read.<br/>Job-specific fit is not assessed.</p><div className="score-meta"><span>{report.wordCount} words</span><span>{report.achievementCount} impact signals</span></div></article>
+        <article className="breakdown-card glass-panel"><div className="card-title"><div><span className="kicker">THE BIG PICTURE</span><h2>What’s behind your score</h2></div><Layers3 size={22}/></div><div className="category-list">{report.categories.map(c => <div className="category" key={c.name}><div><strong>{c.name}</strong><span>{c.earned}<small> / {c.possible}</small></span></div><div className="meter"><i style={{width:`${100*c.earned/c.possible}%`}}/></div><p>{c.explanation}</p></div>)}</div></article></div>
+        {format && <div className={`template-banner ${format.likelyMatch ? 'matched' : ''}`}><span className="template-icon">{format.likelyMatch ? <ShieldCheck size={23}/> : <FileText size={23}/>}</span><div><strong>{format.likelyMatch ? 'Template quality recognized' : 'Template format not recognized'}</strong><p>{format.likelyMatch ? 'Your document follows a consistent professional format.' : 'This does not affect your resume quality audit.'}</p></div>{format.score !== null && <div className="template-score"><strong>{format.score}%</strong><span>TEMPLATE QUALITY</span></div>}</div>}
+        <div className="section-heading"><div><span className="kicker">SMALL CHANGES. MEANINGFUL PROGRESS.</span><h2>Your next best improvements</h2></div><span className="muted">Prioritized by potential score improvement</span></div><div className="feedback-grid">{report.feedback.map((f,i) => <article className="feedback-card glass-panel" key={f.title}><span className="priority">{f.type === 'success' ? <Check size={18}/> : `0${i+1}`}</span><h3>{f.title}</h3><p>{f.desc}</p></article>)}</div>
+        <section className="details-panel glass-panel"><div className="card-title"><div><span className="kicker">NO GUESSWORK</span><h2>Your detailed audit</h2></div><span className="muted">Evidence + practical advice</span></div>{[{name:'Document & readability',items:report.sections.documentSynopsis},{name:'Contact & structure',items:report.sections.dataIdentification},{name:'Writing & clarity',items:report.sections.lexicalAnalysis},{name:'Skills & impact',items:report.sections.semanticAnalysis}].map(group => <details key={group.name}><summary>{group.name}<span>{group.items.reduce((n,i)=>n+(i.earned??0),0)} / {group.items.reduce((n,i)=>n+(i.possible??0),0)} pts <ChevronDown size={16}/></span></summary><div className="detail-items">{group.items.map(item => <div className="detail-item" key={item.title}><span className={item.status === 'pass' ? 'check-pass' : 'check-review'}>{item.status === 'pass' ? <Check size={15}/> : '↗'}</span><div><h4>{item.title}<small>{item.earned} / {item.possible}</small></h4>{item.lines.map((line,i) => <p key={i}>{line}</p>)}</div></div>)}</div></details>)}</section>
+      </section>}
+      {error && <div className="error-message" role="alert"><span>{error}</span><button aria-label="Dismiss error" onClick={() => setError('')}><X size={18}/></button></div>}
+      <input type="file" ref={input} accept=".pdf,.docx,.txt" className="file-input" aria-label="Choose resume file" onChange={e => { if(e.target.files?.[0]) void scan(e.target.files[0]); }}/>
+    </main><footer><Link href="/" className="footer-brand">ResumePro<span> A little clarity. A better next step.</span></Link><span>Thoughtfully reviewed. Confidently improved.</span></footer>
+  </div>;
 }

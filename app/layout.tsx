@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Resume Checker",
-  description: "ATS Resume Audit Tool",
+  title: "ResumePro — Resume Review Studio",
+  description: "A thoughtful resume audit with clear priorities, practical improvements and optional private expert review.",
 };
 
 export default function RootLayout({
