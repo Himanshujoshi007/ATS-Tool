@@ -22,7 +22,7 @@ export async function POST(request: Request) {
     const form = await new Response(body,{headers:{'Content-Type':request.headers.get('content-type')!}}).formData();
     if (form.get('consent') !== CONSENT_VERSION) return json({error:'Permission to save this resume is required.'},400);
     const file = form.get('resume'); const text = form.get('text'); const id = form.get('submissionId');
-    if (!(file instanceof File) || typeof text !== 'string' || text.length > 100_000 || text.trim().length < 150 || typeof id !== 'string' || !/^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i.test(id)) return json({error:'Invalid resume submission.'},400);
+    if (!(file instanceof File) || typeof text !== 'string' || text.length > 100_000 || typeof id !== 'string' || !/^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i.test(id)) return json({error:'Invalid resume submission.'},400);
     const extension = file.name.split('.').pop()?.toLowerCase() || '';
     const bytes = Buffer.from(await file.arrayBuffer());
     if (file.size === 0 || file.size > MAX_RESUME_BYTES || !validSignature(bytes,extension)) return json({error:'Choose a valid PDF, DOCX or TXT smaller than 3 MB.'},400);
